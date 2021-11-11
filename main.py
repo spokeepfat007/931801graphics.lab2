@@ -30,7 +30,7 @@ class MainApp(QtWidgets.QMainWindow, design.Ui_MainWindow):
         self.pushButton_2.clicked.connect(self.on_click2)
         self.pushButton_3.clicked.connect(self.on_click3)
         self.label.setScaledContents(True)
-        pixmap = QPixmap('круги.jpg')
+        pixmap = QPixmap(self.imagePath)
         pixmap = pixmap.scaled(300, 400, QtCore.Qt.KeepAspectRatio)
         self.pixmap=pixmap
         self.label.setPixmap(pixmap)
@@ -133,8 +133,8 @@ class MainApp(QtWidgets.QMainWindow, design.Ui_MainWindow):
         if value[0] == 1 and value[1]==1:
             min=PointsMin
             max=PointsMin+ c/a
-
             return min, max, 0
+
         elif value == [1,0,1,1]:
             min = PointsMin-(c/a-(PointsMax-PointsMin))/2
             max = PointsMax+(c/a-(PointsMax-PointsMin))/2
@@ -143,7 +143,7 @@ class MainApp(QtWidgets.QMainWindow, design.Ui_MainWindow):
             max = PointsMax+(c/a-(PointsMax-PointsMin)) - (PointsMin-min)
             return min, max, 0
         elif value ==[1,0,0,1]:
-            min = PointsMin-(c/a-(PointsMax-PointsMin)) - (max-PointsMax)
+            min = PointsMin-(c/a-(PointsMax-PointsMin) - (max-PointsMax))
             return min, max, 0
         else:
             return min, max, 0
@@ -199,21 +199,9 @@ class MainApp(QtWidgets.QMainWindow, design.Ui_MainWindow):
         # for i in range(1, self.NumOfCopies):
         #     power = pow(2,i)
         #     matrixes+=[image.resize((math.ceil(self.label.size().width()/power), math.ceil(self.label.size().height()/power))).getdata()]
-        for power in range(1, self.NumOfCopies):
+        for power in range(1, min(math.floor(math.log2(self.label.height())),math.floor(math.log2(self.label.width())) )):
             power = pow(2,power)
-            new_picture=[]
-            for j in range(0, self.label.height(), power):
-                for i in range(0, self.label.width(), power):
-                    s= np.zeros(shape=3)
-                    maxi=power if ((self.label.width()-power)>=i)else (self.label.width()-i)
-                    maxj=power if ((self.label.height()-power)>=j) else (self.label.height()-j)
-                    for i1 in range(0,maxi):
-                        for i2 in range(0,maxj):
-                            s+=np.array(image_data[(j+i2)*self.label.width()+(i1+i)])
-                    for i1 in range(0,3):
-                        s[i1]/=maxi*maxj
-                    new_picture+=[s]
-            matrixes+=[new_picture]
+            matrixes+=[self.resizeImage(power, image_data)]
 
         for i in range(int(minX),int(maxX)):
             for j in range(int(minY), int(maxY)):
@@ -224,8 +212,8 @@ class MainApp(QtWidgets.QMainWindow, design.Ui_MainWindow):
                     distance = np.array([i+1, j, 1]).dot(ObrMatrix)-np.array([i, j, 1]).dot(ObrMatrix)
                     K = (abs(distance[0])+abs(distance[1]))/2
                     m=0
-                    if (K>=math.pow(2,self.NumOfCopies-1)):
-                        K=math.pow(2,self.NumOfCopies-1)
+                    if (K>=math.pow(2,min(math.floor(math.log2(self.label.height())),math.floor(math.log2(self.label.width())))-1)):
+                        K=math.pow(2,min(math.floor(math.log2(self.label.height())),math.floor(math.log2(self.label.width())))-1)
                     elif(K<=1):
                         K=1
                     if K<=2:
@@ -237,7 +225,7 @@ class MainApp(QtWidgets.QMainWindow, design.Ui_MainWindow):
                              np.float_(matrixes[m][math.ceil(z[1])//pow(2,m)*math.ceil(self.label.width()/pow(2,m))+int(math.floor(z[0])/pow(2,m))])*(math.ceil(z[0])-z[0]))*(z[1]-math.floor(z[1])) + \
                             (np.float_(matrixes[m][math.floor(z[1])//pow(2,m)*math.ceil(self.label.width()/pow(2,m))+int(math.ceil(z[0])/pow(2,m))])*(z[0]-math.floor(z[0])) +
                              np.float_(matrixes[m][math.floor(z[1])//pow(2,m)*math.ceil(self.label.width()/pow(2,m))+int(math.floor(z[0])/pow(2,m))])*(math.ceil(z[0])-z[0]))*(math.ceil(z[1])-z[1])
-                    Im=matrixes[m][int(z[1]/pow(2,m))*math.ceil(self.label.width()/pow(2,m))+int(z[0]/pow(2,m))]
+                    #Im=matrixes[m][int(z[1]/pow(2,m))*math.ceil(self.label.width()/pow(2,m))+int(z[0]/pow(2,m))]
                     I2m = (np.float_(matrixes[m+1][int(math.ceil(z[1])//(2*pow(2,m)))*math.ceil(self.label.width()/(2*pow(2,m)))+int(math.ceil(z[0])/(2*pow(2,m)))])*(z[0]-math.floor(z[0])) +
                           np.float_(matrixes[m+1][int(math.ceil(z[1])//(2*pow(2,m)))*math.ceil(self.label.width()/(2*pow(2,m)))+int(math.floor(z[0])/(2*pow(2,m)))])*(math.ceil(z[0])-z[0]))*(z[1]-math.floor(z[1])) + \
                          (np.float_(matrixes[m+1][int(math.floor(z[1])//(2*pow(2,m)))*math.ceil(self.label.width()/(2*pow(2,m)))+int(math.ceil(z[0])/(2*pow(2,m)))])*(z[0]-math.floor(z[0])) +
@@ -250,8 +238,22 @@ class MainApp(QtWidgets.QMainWindow, design.Ui_MainWindow):
                 painter.drawPoint(i+481-int(minX)+interX, j+1-int(minY)+interY)
                 self.update()
 
+    def resizeImage(self, power, image_data):
+        new_picture=[]
+        for j in range(0, self.label.height(), power):
+            for i in range(0, self.label.width(), power):
+                s= np.zeros(shape=3)
+                maxi=power if ((self.label.width()-power)>=i)else (self.label.width()-i)
+                maxj=power if ((self.label.height()-power)>=j) else (self.label.height()-j)
+                for i1 in range(0,maxi):
+                    for i2 in range(0,maxj):
+                        s+=np.array(image_data[(j+i2)*self.label.width()+(i1+i)])
+                for i1 in range(0,3):
+                    s[i1]/=maxi*maxj
+                new_picture+=[s]
+        return new_picture
     def IncreaseDecrease(self,matrix,obrmatr):
-        distance = np.array([self.a[0],self.a[1],1])-(np.array([self.a[0],self.a[1],1]).dot(matrix)+np.array([1,0,0])).dot(obrmatr)
+        distance = np.array([self.a[0],self.a[1],1])-(np.array([self.a[0],self.a[1],1]).dot(matrix)+np.array([1,1,0])).dot(obrmatr)
         K = (abs(distance[0])+abs(distance[1]))/2
         if K>=1:
             return "decrease"
@@ -263,15 +265,16 @@ class MainApp(QtWidgets.QMainWindow, design.Ui_MainWindow):
         image = im.open(self.imagePath)
         image = image.resize((self.label.size().width(), self.label.size().height()))
         #image.show()
+
         image_data = image.getdata()
         #self.a=[34, 316, 122, 83, 183, 324, 113, 240, 138, 198, 139, 238]
         a5 = np.array([[self.a[i-i%2+j if i%2==0 else i-i%2+j-3] if j<2 and i%2==0 or j>2 and j<5 and i%2==1 else 1 if j==2 and i%2==0 or j==5 and i%2==1 else 0 for j in range(6)] for i in range(6)])
         v5 = np.array([self.a[6+i] for i in range(6)])
-        # print(v5, a5, sep='\n')
+        print(v5, a5, sep='\n')
 
         result = np.linalg.solve(a5, v5)
         matrix = np.array([[result[3*i+j] if i<2 else 0 if j<2 else 1 for j in range(3)] for i in range(3)]).transpose()
-        # print(matrix)
+        print(matrix)
 
         #Проверка
         # a1 = np.array([self.a[0],self.a[1], 1])
